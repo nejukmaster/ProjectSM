@@ -1,0 +1,15 @@
+code,name,min,max,target
+sta_hp,생명력,0,500,2
+sta_att,공격력,5,100,2
+sta_asp,공격 속도,100,500,2
+sta_criper,치명타 확률,0,100,2
+sta_cridam,치명타 대미지,0,100,2
+sta_ran,사거리,100,500,2
+sta_faith,신앙심,0,666,0
+sta_men,정신력,0,100,0
+sta_def,방어력,0,100,2
+sta_avo,회피율,0,100,0
+sta_move,이동속도,10,100,2
+sta_hit,명중률,0,100,0
+sta_toler,상태 내성,0,100,0
+sta_drop,드롭률,0,10,1
