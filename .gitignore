@@ -11,7 +11,6 @@ ProjectSM/[Ll]ogs/
 ProjectSM/[Pp]ackages/
 ProjectSM/[Mm]emoryCaptures/
 ProjectSM/**/*.meta
-ProjectSM/[Pp]rojectSettings/
 ProjectSM/[Uu]serSettings/
 
 # Asset meta data should only be ignored when the corresponding asset is also ignored
