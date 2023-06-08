@@ -1,4 +1,4 @@
-Shader "Hidden/Pixelize"
+Shader"Hidden/Pixelize"
 {
     Properties
     {
@@ -12,7 +12,10 @@ Shader "Hidden/Pixelize"
 
         _PixelInterpolation("Pixel Interpolation",Int) = 5
 
-        [MaterialToggle] _OutlineRender("Rendering Outline", Float) = 0
+       [Toggle(GAUSS)] _Gauss ("Gaussian Blur", float) = 0
+        _StandardDeviation("Standard Deviation (Gauss only)", Range(0, 0.01)) = 0.001
+
+        [Toggle(OUTLINE)] _OutlineRender("Rendering Outline", Float) = 0
     }
 
         SubShader
@@ -25,6 +28,8 @@ Shader "Hidden/Pixelize"
         HLSLINCLUDE
         #pragma vertex vert
         #pragma fragment frag
+        #pragma shader_feature OUTLINE
+        #pragma shader_feature GAUSS
 
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
@@ -52,7 +57,7 @@ Shader "Hidden/Pixelize"
         float _DepthMult;
         float _DepthBias;
         int _PixelInterpolation;
-        float _OutlineRender;
+        float _StandardDeviation;
 
         half4 _OutlineColor;
 
@@ -79,6 +84,9 @@ Shader "Hidden/Pixelize"
             Name "Pixelation"
 
             HLSLPROGRAM
+
+            #define PI 3.14159265359
+            #define E 2.71828182846
 
             void Compare(inout float depthOutline, inout float normalOutline,float2 uv) {
                 //float3 neighborNormal = SampleSceneNormals(uv + _BlockSize.xy * offset);
@@ -125,24 +133,41 @@ Shader "Hidden/Pixelize"
                 float2 blockPos = floor(IN.uv * _BlockCount);
                 float2 blockCenter = blockPos * _BlockSize + _HalfBlockSize;
 
-                half4 tex = half4(0, 0, 0, 1);
+                half4 tex = 0.0;
 
-                int a = 0;
-                for (int i = 0; i < _BlockSize.x / _MainTex_TexelSize.x; i++) {
-                    for (int j = 0; j < _BlockSize.y / _MainTex_TexelSize.y; j++) {
-                        tex = tex + SAMPLE_TEXTURE2D(_MainTex, sampler_point_clamp, blockPos * _BlockSize + _MainTex_TexelSize * float2(i, j));
-                        a++;
-                    }
+                #if GAUSS
+                if(_StandardDeviation == 0)
+                        tex = SAMPLE_TEXTURE2D(_MainTex, sampler_point_clamp, blockCenter);
+                else{
+                        float sum = 0;
+                        for (int i = 0; i < _BlockSize.x / _MainTex_TexelSize.x; i++) {
+                            for (int j = 0; j < _BlockSize.y / _MainTex_TexelSize.y; j++) {
+                                float offset = length(blockPos * _BlockSize + _MainTex_TexelSize * float2(i, j) - blockCenter);
+                                float stDevSquared = _StandardDeviation * _StandardDeviation;
+                                float gauss = (1 / sqrt(2 * PI * stDevSquared)) * pow(E, -((offset * offset) / (2 * stDevSquared)));
+                                sum += gauss;
+                                tex += SAMPLE_TEXTURE2D(_MainTex, sampler_point_clamp, blockPos * _BlockSize + _MainTex_TexelSize * float2(i, j)) * gauss;
+                            }
+                        }
+                        tex = tex/sum;
                 }
-
-                tex = tex / a;
+                #else
+                int sum = 0;
+                for (int i = 0; i < _BlockSize.x / _MainTex_TexelSize.x; i++) {
+                        for (int j = 0; j < _BlockSize.y / _MainTex_TexelSize.y; j++) {
+                        tex = tex + SAMPLE_TEXTURE2D(_MainTex, sampler_point_clamp, blockPos * _BlockSize + _MainTex_TexelSize * float2(i, j));
+                        sum++;
+                        }
+                }
+                tex = tex/sum;
+                #endif
 
                 //로딩한 텍스쳐를 샘플링합니다.
                 //SAMPLE_TEXTURE2D(텍스쳐 오브젝트, 샘플러, uv)
                 //float4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_point_clamp, blockCenter);
                 //return float4(IN.uv,1,1);
-
-                if (_OutlineRender == 1) {
+                
+                #if OUTLINE
                     float3 normal = SampleSceneNormals(blockCenter);
                     float depth = SampleSceneDepth(blockCenter);
                     float normalDifference = 0;
@@ -162,7 +187,7 @@ Shader "Hidden/Pixelize"
 
                     float4 color = lerp(tex, _OutlineColor, outline);
                     return color;
-                }
+                #endif
                 return tex;
             }
             ENDHLSL
