@@ -10,11 +10,13 @@ public class PlayerMovementManager
     IEnumerator jumpEnumerator;
     int jumpCount = 0;
     Coroutine currentCo;
+    EffectController globalEffects;
 
     Animator animator;
     public PlayerMovementManager(Animator animator, PlayerController controller){
         this.animator = animator;
         this.controller = controller;
+        globalEffects = EffectController.globalEffectController;
     }
 
     public Vector3 JumpMove(bool p_keyDown)
@@ -31,7 +33,7 @@ public class PlayerMovementManager
                 animator.SetTrigger("Jump");
                 controller.playerEffects.StopEffect("lending");
 
-                controller.globalEffects.PlayEffect("JumpEffect",new Vector3(controller.transform.position.x,controller.transform.position.y - controller.transform.localScale.y/2,controller.transform.position.z));
+                globalEffects.PlayEffect("JumpEffect",new Vector3(controller.transform.position.x,controller.transform.position.y,controller.transform.position.z));
             }
         }
         if(jumpEnumerator != null)

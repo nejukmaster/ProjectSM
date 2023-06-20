@@ -12,7 +12,10 @@ public class EffectDic
 }
 public class EffectController : MonoBehaviour
 {
+    public static EffectController globalEffectController;
+
     [SerializeField] List<EffectDic> effectDictionary = new List<EffectDic> ();
+    [SerializeField] bool isGlobalEffect;
     // Start is called before the first frame update
     void Start()
     {
@@ -20,6 +23,8 @@ public class EffectController : MonoBehaviour
         {
             effectDictionary[i].value.Stop();
         }
+        if (isGlobalEffect)
+            globalEffectController = this;
     }
 
     // Update is called once per frame

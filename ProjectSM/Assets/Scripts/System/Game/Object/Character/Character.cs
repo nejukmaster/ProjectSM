@@ -20,15 +20,33 @@ public class Status
 public class Character : MonoBehaviour
 {
     [Header("Character Properties")]
+    [Tooltip("캐릭터의 능력치 딕셔너리")]
     public SerializableDict<Status> statusDic;
+    [Tooltip("이 캐릭터의 인벤토리 사이즈")]
     public int inventorySize;
+    [Tooltip("이 캐릭터의 아이디")]
+    public int id;
 
-    Inventory inventory;
+    public bool OnReady
+    {
+        get
+        {
+            return theObjectPool != null && statusDic.GetDic().Count > 0;
+        }
+        set
+        {
+
+        }
+    }
+
+    protected ObjectPool theObjectPool;
+    protected Inventory inventory;
 
     [ExecuteAlways]
     private void Start()
     {
         statusDic = new SerializableDict<Status>();
+        theObjectPool = ObjectPool.instance;
         FixedStart();
     }
     // Update is called once per frame
@@ -44,5 +62,10 @@ public class Character : MonoBehaviour
     public Inventory GetInventory()
     {
         return inventory;
+    }
+
+    public virtual void Despawn()
+    {
+        Stage.Instance.CharacterDespawnHook(this);
     }
 }

@@ -2,11 +2,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DummyAttack : MonoBehaviour
+public class DummyAttack : Attack
 {
-    [SerializeField] Player player;
+    EnemyController controller => this.GetComponentInParent<EnemyController>();
     public void _BasicAttack()
     {
-        player.GetComponent<PlayerController>().Hit();
+        Player.Instance.GetComponent<PlayerController>().Hit();
+        base.OnAttack(Player.Instance);
     }
 }

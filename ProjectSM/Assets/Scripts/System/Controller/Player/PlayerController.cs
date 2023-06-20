@@ -38,8 +38,6 @@ public class PlayerController : MonoBehaviour
     public Animator animator;
     [Tooltip("플레이어 머티리얼")]
     [SerializeField] Material mat;
-    [Tooltip("씬의 메인라이트")]
-    [SerializeField] GameObject mainLight;
     [Tooltip("플레이어가 피격시 빛날 색깔")]
     public Color hitColor;
     [Tooltip("플레이어가 피격시 빛날 시간")]
@@ -54,6 +52,8 @@ public class PlayerController : MonoBehaviour
     Color matColor;
     Coroutine currentCo;
     public List<PressedKey> pressedKeys = new List<PressedKey>();
+
+    GameObject mainLight;
 
 
 
@@ -95,49 +95,53 @@ public class PlayerController : MonoBehaviour
         this.player = this.GetComponent<Player>();
         ObservableStateMachineTrigger trigger = animator.GetBehaviour<ObservableStateMachineTrigger>();
         matColor = mat.GetColor("_Color");
+        mainLight = RenderSettings.sun.gameObject;
     }
 
     // Update is called once per frame
     void Update()
     {
-        Vector3 moveDir = Vector3.zero;
-        float horizon = Input.GetAxis("Horizontal");
-        float verti = Input.GetAxis("Vertical");
-
-        moveDir += playerMovementManager.BasicMove(verti,horizon);
-
-        moveDir += playerMovementManager.JumpMove(Input.GetKeyDown(KeyCode.I));
-
-        if (Input.anyKeyDown)
+        if (player.OnReady && GameManager.instance.onGame)
         {
-            playerMovementManager.AttackMove(Input.GetKeyDown(KeyCode.Q));
+            Vector3 moveDir = Vector3.zero;
+            float horizon = Input.GetAxis("Horizontal");
+            float verti = Input.GetAxis("Vertical");
 
-            if (CheckKeyDown() != KeyCode.None)
-                pressedKeys.Add(new PressedKey(CheckKeyDown()));
-            for(int i = 0; i < Commands.commands.Count; i++)
+            moveDir += playerMovementManager.BasicMove(verti, horizon);
+
+            moveDir += playerMovementManager.JumpMove(Input.GetKeyDown(KeyCode.I));
+
+            if (Input.anyKeyDown)
             {
-                if (CheckCommand(Commands.commands.ElementAt(i).Key))
+                playerMovementManager.AttackMove(Input.GetKeyDown(KeyCode.Q));
+
+                if (CheckKeyDown() != KeyCode.None)
+                    pressedKeys.Add(new PressedKey(CheckKeyDown()));
+                for (int i = 0; i < Commands.commands.Count; i++)
                 {
-                    moveDir += Commands.commands.ElementAt(i).Value();
+                    if (CheckCommand(Commands.commands.ElementAt(i).Key))
+                    {
+                        moveDir += Commands.commands.ElementAt(i).Value();
+                    }
                 }
             }
-        }
 
-        for(int i = 0; i < pressedKeys.Count; i++)
-        {
-            pressedKeys[i].time -= Time.deltaTime;
-            if (pressedKeys[i].time <= 0)
+            for (int i = 0; i < pressedKeys.Count; i++)
             {
-                pressedKeys.RemoveAt(i);
-                i--;
+                pressedKeys[i].time -= Time.deltaTime;
+                if (pressedKeys[i].time <= 0)
+                {
+                    pressedKeys.RemoveAt(i);
+                    i--;
+                }
             }
+
+            myCharacterController.Move(moveDir);
+
+
+
+            mat.SetVector("_ObjToLight", mainLight.transform.position - this.transform.position);
         }
-
-        myCharacterController.Move(moveDir);
-
-
-
-        mat.SetVector("_ObjToLight", mainLight.transform.position - this.transform.position);
     }
 
     private KeyCode CheckKeyDown()

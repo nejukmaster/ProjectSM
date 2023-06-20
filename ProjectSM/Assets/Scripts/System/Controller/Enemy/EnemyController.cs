@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UniRx;
 using UniRx.Triggers;
+using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.EventSystems;
@@ -22,17 +23,18 @@ public struct EnemyAttribute
     public float hitBlinkSec;
     [Tooltip("Enemy를 쉐이딩할 주 광원")]
     public GameObject mainLight;
-    [Tooltip("Enemy의 적 감지 범위: x,y")]
-    public Vector2 dectectingRange;
+    [Tooltip("Enemy의 자유배회 범위")]
+    public float loiteringRange;
 }
 public class EnemyController : MonoBehaviour
 {
-
     [SerializeField] EnemyAttribute attr;
     Coroutine currentCo;
     Color matColor;
     Enemy enemy;
-    NavMeshAgent navAgent;
+    float detectRange => enemy.statusDic.GetDic()["sta_ran"].value * 3f;
+    Vector3 destination;
+    CharacterController characterController;
 
     bool canMove = true;
     // Start is called before the first frame update
@@ -40,7 +42,7 @@ public class EnemyController : MonoBehaviour
     {
         matColor = attr.mat.GetColor("_Color");
         this.enemy = GetComponent<Enemy>();
-        navAgent = GetComponent<NavMeshAgent>();
+        characterController = GetComponent<CharacterController>();
 
         ObservableStateMachineTrigger trigger = attr.animator.GetBehaviour<ObservableStateMachineTrigger>();
         IDisposable exitState = trigger.OnStateExitAsObservable().Subscribe(onStateInfo =>
@@ -49,10 +51,15 @@ public class EnemyController : MonoBehaviour
             if (info.IsName("Base Layer.Beatdown"))
             {
                 enemy.Despawn();
+                Stage.Instance.CharacterDeathHook(enemy);
             }
             if (info.IsName("Base Layer.Attack"))
             {
                 canMove = true;
+            }
+            if (info.IsName("Base Layer.Walking"))
+            {
+                canMove= false;
             }
         }).AddTo(this);
         IDisposable enterState = trigger.OnStateEnterAsObservable().Subscribe(onStateInfo =>
@@ -62,56 +69,104 @@ public class EnemyController : MonoBehaviour
             {
 
             }
-        });
+            if(info.IsName("Base Layer.Hit") || info.IsName("Base Layer.Hit0"))
+            {
+                canMove = false;
+            }
+            if(info.IsName("Base Layer.Walking"))
+            {
+                canMove = true;
+            }
+            if(info.IsName("Base Layer.BeatDown"))
+            {
+                canMove = false;
+            }
+        }).AddTo(this);
     }
 
     // Update is called once per frame
     void Update()
     {
-        GameObject player = GameObject.FindWithTag("Player");
-        Vector3 moveDir = Vector3.zero;
-
-        moveDir.y -= attr.gravity * Time.deltaTime;
-
-        attr.mat.SetVector("_ObjToLight", attr.mainLight.transform.position - this.transform.position);
-
-        float disTplayer = player.transform.position.z - this.transform.position.z;
-        if (Mathf.Abs(disTplayer) < attr.dectectingRange.x && Mathf.Abs(disTplayer) > enemy.statusDic.GetDic()["sta_ran"].value)
+        if (enemy.OnReady && GameManager.instance.onGame)
         {
-            if (canMove)
+            GameObject player = GameObject.FindWithTag("Player");
+            Vector3 moveDir = Vector3.zero;
+
+            moveDir.y -= attr.gravity * Time.deltaTime;
+
+            //attr.mat.SetVector("_ObjToLight", attr.mainLight.transform.position - this.transform.position);
+
+            float disTplayer = player.transform.position.z - this.transform.position.z;
+
+            if (Math.Abs(destination.z - this.transform.position.z) > 0.1f && canMove)
             {
-                if(disTplayer * this.transform.forward.z < 0)
-                {
-                    navAgent.enabled = false;
-                    this.transform.rotation = Quaternion.Euler(0, 90f * this.transform.forward.z + 90, 0);
-                    navAgent.enabled = true;
-                }
-                navAgent.SetDestination(player.transform.position);
-                navAgent.speed = enemy.statusDic.GetDic()["sta_move"].value;
-                navAgent.stoppingDistance = enemy.statusDic.GetDic()["sta_ran"].value;
+                moveDir += new Vector3(0, 0, this.transform.forward.z * enemy.statusDic.GetDic()["sta_move"].value * Time.deltaTime);
+            }
+
+            //자유 배회
+            if (Mathf.Abs(disTplayer) > detectRange)
+            {
                 attr.animator.SetBool("Walking", true);
-            }
-        }
-        else if(Mathf.Abs(disTplayer) <= enemy.statusDic.GetDic()["sta_ran"].value)
-        {
-            attr.animator.SetBool("Walking", false);
-            if (!attr.animator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
-            {
-                canMove = false;
-                attr.animator.SetTrigger("Attack");
-                if (disTplayer * this.transform.forward.z < 0)
+                if (Math.Abs(destination.z - this.transform.position.z) <= 0.1f)
                 {
-                    navAgent.enabled = false;
-                    this.transform.rotation = Quaternion.Euler(0,90f * this.transform.forward.z + 90,0);
-                    navAgent.enabled = true;
+                    Vector3 dest = transform.position - new Vector3(0f, 0f, attr.loiteringRange * transform.forward.z);
+                    this.transform.rotation = Quaternion.Euler(0, 90f * this.transform.forward.z + 90, 0);
+                    destination = dest;
                 }
-                navAgent.SetDestination(this.transform.position);
-                navAgent.velocity = Vector3.zero;
-                navAgent.speed = 0;
             }
+            //감지 범위 내 진입시 추적
+            if (Math.Abs(disTplayer) <= detectRange && Math.Abs(disTplayer) > enemy.statusDic.GetDic()["sta_ran"].value)
+            {
+                RaycastHit hit;
+                if (Physics.Raycast(transform.position + new Vector3(0, 0.5f, 0), new Vector3(0, 0, transform.forward.z), out hit, 50f) && hit.collider.gameObject.CompareTag("Player"))
+                {
+                    if (disTplayer * this.transform.forward.z < 0)
+                    {
+                        this.transform.rotation = Quaternion.Euler(0, 90f * this.transform.forward.z + 90, 0);
+                    }
+                    destination = player.transform.position;
+                    attr.animator.SetBool("Walking", true);
+                }
+                else
+                {
+                    attr.animator.SetBool("Walking", true);
+                    if (Math.Abs(destination.z - this.transform.position.z) <= 0.1f)
+                    {
+                        Vector3 dest = transform.position - new Vector3(0f, 0f, attr.loiteringRange * transform.forward.z);
+                        this.transform.rotation = Quaternion.Euler(0, 90f * this.transform.forward.z + 90, 0);
+                        destination = dest;
+                    }
+                }
+            }
+            //사거리내 진입시 공격
+            else if (Mathf.Abs(disTplayer) <= enemy.statusDic.GetDic()["sta_ran"].value && canMove)
+            {
+                attr.animator.SetBool("Walking", false);
+                if (!attr.animator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
+                {
+                    attr.animator.SetTrigger("Attack");
+                    if (disTplayer * this.transform.forward.z < 0)
+                    {
+                        this.transform.rotation = Quaternion.Euler(0, 90f * this.transform.forward.z + 90, 0);
+                    }
+                }
+            }
+
+            characterController.Move(moveDir);
         }
     }
-    
+
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        GameObject go = hit.gameObject;
+        if (go.CompareTag("Obstacle"))
+        {
+            Vector3 dest = transform.position - new Vector3(0f, 0f, attr.loiteringRange * transform.forward.z);
+            this.transform.rotation = Quaternion.Euler(0, 90f * this.transform.forward.z + 90, 0);
+            destination = dest;
+        }
+    }
+
     public void Hit(int dmg)
     {
         if (currentCo != null)
@@ -121,10 +176,7 @@ public class EnemyController : MonoBehaviour
         currentCo = StartCoroutine(HitCo());
         if (attr.animator.GetCurrentAnimatorStateInfo(0).IsName("Hit")|| attr.animator.GetCurrentAnimatorStateInfo(0).IsName("Hit0"))
         {
-            navAgent.velocity = Vector3.zero;
-            navAgent.speed = 0;
             attr.animator.SetTrigger("Hit");
-
         }
         else attr.animator.SetTrigger("Hit");
         enemy.statusDic.GetDic()["sta_hp"].value -= dmg;

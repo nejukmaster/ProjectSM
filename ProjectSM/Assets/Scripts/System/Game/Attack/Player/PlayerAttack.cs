@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Attack : MonoBehaviour
+public class PlayerAttack : Attack
 {
     PlayerController controller => this.GetComponentInParent<PlayerController>();
     public void _BasicAttack()
@@ -27,6 +27,7 @@ public class Attack : MonoBehaviour
                     {
                         enemies[i].GetComponent<EnemyController>().Hit(_dict["sta_att"].value + (int)(_dict["sta_att"].value * (float)(_dict["sta_cridam"].value) / 100f));
                     }
+                    base.OnAttack(enemies[i].GetComponent<Enemy>());
                 }
             }
         }

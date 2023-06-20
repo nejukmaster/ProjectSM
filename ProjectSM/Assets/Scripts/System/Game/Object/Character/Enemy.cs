@@ -4,8 +4,7 @@ using UnityEngine;
 
 public class Enemy : Character
 {
-    [Header("Enemy Properties")]
-    ObjectPool theObjectPool;
+
     public override void FixedStart()
     {
         List<Dictionary<string, object>> statusData = CSVReader.Read("DataSheet/Status");
@@ -17,13 +16,12 @@ public class Enemy : Character
                 statusDic.data.Add(new SerializeData<Status>(statusData[i]["code"].ToString(), _st));
             }
         }
-        theObjectPool = ObjectPool.instance;
     }
 
-    public void Despawn()
+    public override void Despawn()
     {
-        Debug.Log(theObjectPool);
-        theObjectPool.EnemyQueue.Enqueue(this.gameObject);
+        base.Despawn();
+        theObjectPool.QueueList[id].Enqueue(this.gameObject);
         this.gameObject.SetActive(false);
     }
 }

@@ -16,13 +16,24 @@ public class ObjectPool : MonoBehaviour
 
     public static ObjectPool instance;
 
-    //오브젝트 풀의 역할을 해줄 큐 리스트 생성
-    public Queue<GameObject> EnemyQueue = new Queue<GameObject>();
+    public Dictionary<int,Queue<GameObject>> QueueList = new Dictionary<int,Queue<GameObject>>();
     // Start is called before the first frame update
-    void Awake()
+    public void Start()
     {
         instance = this;
-        EnemyQueue = InsertQueue(objectInfo[0]);
+    }
+
+    public void EnablePool(int index, int id)
+    {
+        QueueList.Add(id, InsertQueue(objectInfo[index]));
+    }
+
+    public void DisablePools()
+    {
+        foreach(int i in QueueList.Keys)
+        {
+            QueueList.Remove(i);
+        }
     }
 
     Queue<GameObject> InsertQueue(ObjectInfo p_objectInfo)
@@ -30,8 +41,7 @@ public class ObjectPool : MonoBehaviour
         Queue<GameObject> t_queue = new Queue<GameObject>();
         for (int i = 0; i < p_objectInfo.count; i++)
         {
-            //Quaternion.identity는 회전량이 0인 Quaternion객체를 반환한다.
-            GameObject t_clone = Instantiate(p_objectInfo.goPrefab, transform.position, Quaternion.identity);
+            GameObject t_clone = Instantiate(p_objectInfo.goPrefab, p_objectInfo.tfPoolParent.transform.position, Quaternion.identity);
             t_clone.SetActive(false);
             if (p_objectInfo.tfPoolParent != null)
                 t_clone.transform.SetParent(p_objectInfo.tfPoolParent);
@@ -40,5 +50,13 @@ public class ObjectPool : MonoBehaviour
             t_queue.Enqueue(t_clone);
         }
         return t_queue;
+    }
+
+    void DestroyQueue(int key)
+    {
+        while (QueueList[key].Count > 0)
+        {
+            Destroy(QueueList[key].Dequeue());
+        }
     }
 }

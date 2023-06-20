@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Player : Character
 {
+    public static Player Instance;
     [Header("Player Properties")]
     public float gauge = 0;
     public override void FixedStart()
@@ -17,5 +18,6 @@ public class Player : Character
                 statusDic.data.Add(new SerializeData<Status>(statusData[i]["code"].ToString(), _st));
             }
         }
+        Instance = this;
     }
 }
